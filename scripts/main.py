@@ -8,36 +8,29 @@ import sqlite3
 from datetime import datetime
 
 
-''' сервис, который обходит произвольный сайт
-(например https://ria.ru/, http://www.vesti.ru/, http://echo.msk.ru/, http://tass.ru/ural, http
-s://lenta.ru/) с глубиной 2 и сохраняет html, url и title страницы в произвольное хранилище '''
-
 parser = False
 
+url_table = {}
+sql_rows = []
+
 # arguments part
-# parser = ArgumentParser()
-# parser.add_argument("load", help="write site url for load new site")
-# parser.add_argument("get", help="write site url to get links")
-# parser.add_argument("--depth", dest="depth", help="write depth of search")
-# parser.add_argument("-n", dest="number", help="write number of links")
-# args = parser.parse_args()
+parser = ArgumentParser()
+parser.add_argument("--load", "-l", dest="load",
+                    help="write site url for load new site")
+parser.add_argument("--get", "-g", dest="get",
+                    help="write site url to get links")
+parser.add_argument("--depth", dest="depth", help="write depth of search")
+parser.add_argument("-n", dest="number", help="write number of links")
+args = parser.parse_args()
 
-# if args.get.startswith("http"):
-#     url = args.get
-# else:
-#     url = args.load
-
-# if args.depth:
-#     max_level = int(args.depth)
-# if args.number:
-#     number_of_urls = int(args.number)
+if args.depth:
+    max_level = int(args.depth)
+if args.number:
+    number_of_urls = int(args.number)
 
 
 if not parser:
     url = "http://www.python.org"
-
-url_table = {}
-sql_rows = []
 
 if not parser:
     max_level = 2
@@ -60,7 +53,10 @@ def getURL(page):
 
 
 def beautiful_result(url):
-    response = requests.get(url)
+    try:
+        response = requests.get(url)
+    except Exception as e:
+        response = requests.get(url, verify=False)
     # parse html
     beautiful_soup_result = BeautifulSoup(response.content)
     return beautiful_soup_result.title.next, str(beautiful_soup_result)
@@ -76,16 +72,13 @@ def save_page(page, url_table, search_queue, level, base_url):
             else:
                 url = base_url + url
 
-            '''если оставить на этом уровне, то будут только для сайта уровни, если спустить на уровень ниже 
-            (убрать один таб), то захватит и другие сайты
+            '''если оставить на этом уровне, то будут только для сайта уровни, 
+            если спустить на уровень ниже (убрать один таб), то захватит и другие сайты
             '''
             if url not in url_table:
-                print(url)
+                # print(url)
                 url_table[url] = {}
                 url_table[url]['level'] = level
-                if level == 3:  # debug cond
-                    stop = True
-                    stop = False
                 if level < max_level:
                     search_queue += [url]
                 else:
@@ -117,8 +110,6 @@ def load(url_table, sql_rows):
     url_table[url]['title'] = title
     url_table[url]['page'] = page
 
-    # c.execute("INSERT INTO urls VALUES ('2006-01-05','BUY','RHAT',100,35.14)")
-
     search_queue = deque()
     search_queue += [url]
     parent = url
@@ -149,17 +140,6 @@ def get(url, number):
     conn = sqlite3.connect('pages.db')
     c = conn.cursor()
 
-    # c.execute('''CREATE TABLE urls
-    #             (url text, title text, html text, parent text)''')
-
-    # c.execute("INSERT INTO urls VALUES ('http://www.python.org/first','first_title','first_html','http://www.python.org')")
-    # c.execute("INSERT INTO urls VALUES ('http://www.python.org/second','second_title','second_html','http://www.python.org')")
-    # conn.commit()
-
-    # c.execute('SELECT DISTINCT * FROM urls')
-    # for row in c.fetchall():
-    #     print(f'{row[0]}: {row[1]}')
-
     t = (url, number)
     c.execute('SELECT DISTINCT * FROM urls WHERE parent=? LIMIT ?', t)
     for row in c.fetchall():
@@ -169,8 +149,15 @@ def get(url, number):
 
 
 # load(url_table, sql_rows)
-
 # get(url, number_of_urls)
+
+
+if args.get:
+    url = args.get
+    get(url, number_of_urls)
+else:
+    url = args.load
+    load(url_table, sql_rows)
 
 
 # check lvls of urls
